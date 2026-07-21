@@ -92,27 +92,19 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="PDF 파일만 가능합니다.")
 
     pdf_content = await file.read()
-    try:
-        from pdf2image import convert_from_bytes
-        images = convert_from_bytes(pdf_content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF를 이미지로 변환 실패: {str(e)}")
     
-    contents = ["이 등기부등본 이미지를 분석하여 데이터를 추출하세요."]
-    for img in images:
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='JPEG')
-        
-        contents.append(
-            types.Part.from_bytes(
-                data=img_byte_arr.getvalue(),
-                mime_type='image/jpeg'
-            )
+    # 💡 PDF 바이너리 데이터를 Gemini에게 직접 전달 (이미지 변환 과정 불필요!)
+    contents = [
+        "이 등기부등본 문서를 분석하여 데이터를 추출하세요.",
+        types.Part.from_bytes(
+            data=pdf_content,
+            mime_type='application/pdf'
         )
+    ]
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',  # 안정적인 최신 Gemini Flash 모델 지정
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -133,6 +125,7 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
             
         return data
     except Exception as e:
+        print(f"Gemini API Error: {e}")  # Render Logs에서 에러를 볼 수 있도록 print 추가
         raise HTTPException(status_code=500, detail=f"Gemini 분석 오류: {str(e)}")
 
 # 4. 안전한 법인 데이터 저장 API

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, UserCheck, Briefcase } from 'lucide-react';
 
+// Render 배포 백엔드 서버 주소
+const API_BASE_URL = 'https://law-asist.onrender.com';
+
 interface ParserProps {
-  onRefresh?: () => void; // 저장 완료 후 대장 목록을 새로고침하기 위한 부모 컴포넌트 함수
+  onSaveSuccess?: () => void; // App.tsx에서 넘겨주는 프롭명 (TS 빌드 에러 해결)
+  onRefresh?: () => void;     // 하위 호환성을 위해 유지
 }
 
-export const RegistryParser: React.FC<ParserProps> = ({ onRefresh }) => {
+export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -18,7 +22,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onRefresh }) => {
     }
   };
 
-  // 1. PDF 파싱 API 호출
+  // 1. PDF 파싱 API 호출 (Render 백엔드 주소로 변경)
   const handleParse = async () => {
     if (!file) return;
     setIsLoading(true);
@@ -27,7 +31,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onRefresh }) => {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/api/parse-registry', {
+      const response = await fetch(`${API_BASE_URL}/api/parse-registry`, {
         method: 'POST',
         body: formData,
       });
@@ -46,13 +50,13 @@ export const RegistryParser: React.FC<ParserProps> = ({ onRefresh }) => {
     }
   };
 
-  // 2. [수정] DB 저장 API 호출 및 화면 초기화 로직
+  // 2. DB 저장 API 호출 및 화면 초기화 로직 (Render 백엔드 주소로 변경)
   const handleSave = async () => {
     if (!parsedData) return;
     setIsSaving(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/save-corporate', {
+      const response = await fetch(`${API_BASE_URL}/api/save-corporate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,12 +70,16 @@ export const RegistryParser: React.FC<ParserProps> = ({ onRefresh }) => {
         // ① 아버님이 인지하실 수 있도록 성공 얼럿 메시지 표시
         alert(result.message || "법인 대장 정보가 데이터베이스에 성공적으로 영구 저장되었습니다.");
         
-        // ② [핵심] 다시 새로운 파일을 업로드할 수 있는 초기 상태화면으로 복귀
+        // ② 다시 새로운 파일을 업로드할 수 있는 초기 상태화면으로 복귀
         setParsedData(null);
         setFile(null);
         
         // ③ 실시간으로 대장 탭 목록을 갱신하도록 부모 컴포넌트 알림
-        if (onRefresh) onRefresh();
+        if (onSaveSuccess) {
+          onSaveSuccess();
+        } else if (onRefresh) {
+          onRefresh();
+        }
       } else {
         alert(`저장 실패: ${result.detail || '서버 오류가 발생했습니다.'}`);
       }

@@ -39,11 +39,11 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
     }
   };
 
-  // 삭제 요청 API 호출
+  // 삭제 요청 API 호출 (상대 경로 사용으로 배포 환경 대응)
   const handleDeleteData = async (id: number) => {
     if (!window.confirm("이 법인 대장 기록을 정말로 영구 삭제하시겠습니까?")) return;
     try {
-      const response = await fetch(`http://localhost:8000/api/corporates/${id}`, {
+      const response = await fetch(`/api/corporates/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -57,10 +57,11 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
     }
   };
 
+  // 수정 저장 API 호출 (상대 경로 사용으로 배포 환경 대응)
   const saveUpdatedData = async () => {
     if (!editForm) return;
     try {
-      const response = await fetch(`http://localhost:8000/api/corporates/${editForm.id}`, {
+      const response = await fetch(`/api/corporates/${editForm.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm)
@@ -69,8 +70,13 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
         alert("데이터베이스 수정 사항이 영구 저장되었습니다.");
         setEditingCorpId(null);
         onRefresh();
+      } else {
+        const errorData = await response.json();
+        alert(`수정 실패: ${errorData.detail || '서버 오류'}`);
       }
-    } catch (err) { alert("수정 오류 발생"); }
+    } catch (err) { 
+      alert("수정 통신 오류 발생"); 
+    }
   };
 
   return (
@@ -142,7 +148,7 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
                   ) : ( <span className="font-medium text-slate-800">{corp.total_shares_issued} 주</span> )}
                 </div>
 
-                {/* [추가] 담당 고객 연락처 정보 로우 */}
+                {/* 담당 고객 연락처 정보 로우 */}
                 <div className="md:col-span-3 border-t border-slate-200/60 pt-3 mt-1">
                   <span className="text-indigo-600 font-bold block mb-2 flex items-center gap-1"><UserCircle size={14}/> 관리 담당자(고객) 정보</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -162,7 +168,7 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
                 </div>
               </div>
 
-              {/* 임원 리스트 테이블 (+ 연락처 컬럼 확장) */}
+              {/* 임원 리스트 테이블 */}
               <div className="space-y-2">
                 <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1"><UserCheck size={14} className="text-slate-400" /> 임원 임기 명부</h4>
                 <div className="overflow-x-auto">
@@ -183,7 +189,6 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
                           <td className="p-2">{editingCorpId === corp.id ? <input type="text" value={exec.position} onChange={(e) => handleExecutiveFormChange(idx, 'position', e.target.value)} className="border p-1 w-20 rounded" /> : <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[11px]">{exec.position}</span>}</td>
                           <td className="p-2">{editingCorpId === corp.id ? <input type="date" value={exec.appointed_at} onChange={(e) => handleExecutiveFormChange(idx, 'appointed_at', e.target.value)} className="border p-1 font-mono rounded" /> : <span className="font-mono text-slate-500">{exec.appointed_at}</span>}</td>
                           <td className="p-2">{editingCorpId === corp.id ? <input type="date" value={exec.expired_at} onChange={(e) => handleExecutiveFormChange(idx, 'expired_at', e.target.value)} className="border p-1 font-mono text-rose-600 font-bold rounded" /> : <span className="font-mono text-rose-600 font-bold">{exec.expired_at}</span>}</td>
-                          {/* 임원 개인 연락처 입력란 추가 */}
                           <td className="p-2">
                             {editingCorpId === corp.id ? (
                               <input type="text" value={exec.phone || ""} onChange={(e) => handleExecutiveFormChange(idx, 'phone', e.target.value)} className="border p-1 w-28 placeholder-slate-300 rounded" placeholder="010-0000-0000" />

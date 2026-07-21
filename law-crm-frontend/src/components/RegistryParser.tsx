@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, UserCheck, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, UserCheck, Briefcase, PhoneCall } from 'lucide-react';
 
 // Render 배포 백엔드 서버 주소
 const API_BASE_URL = 'https://law-asist.onrender.com';
@@ -22,7 +22,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
     }
   };
 
-  // 1. PDF 파싱 API 호출 (Render 백엔드 주소로 변경)
+  // 1. PDF 파싱 API 호출
   const handleParse = async () => {
     if (!file) return;
     setIsLoading(true);
@@ -38,6 +38,10 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
 
       if (response.ok) {
         const data = await response.json();
+        
+        // 💡 파싱된 데이터에 사용자가 입력할 수 있는 담당자 연락처 필드 초기화 (기본값 빈 문자열)
+        data.manager_contact = data.manager_contact || '';
+        
         setParsedData(data);
       } else {
         const errorData = await response.json();
@@ -50,7 +54,15 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
     }
   };
 
-  // 2. DB 저장 API 호출 및 화면 초기화 로직 (Render 백엔드 주소로 변경)
+  // 💡 담당자 연락처 입력값 변경 핸들러
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setParsedData({
+      ...parsedData,
+      manager_contact: e.target.value
+    });
+  };
+
+  // 2. DB 저장 API 호출 및 화면 초기화 로직
   const handleSave = async () => {
     if (!parsedData) return;
     setIsSaving(true);
@@ -61,20 +73,17 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(parsedData),
+        body: JSON.stringify(parsedData), // manager_contact 필드가 포함된 상태로 전송됨
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        // ① 아버님이 인지하실 수 있도록 성공 얼럿 메시지 표시
         alert(result.message || "법인 대장 정보가 데이터베이스에 성공적으로 영구 저장되었습니다.");
         
-        // ② 다시 새로운 파일을 업로드할 수 있는 초기 상태화면으로 복귀
         setParsedData(null);
         setFile(null);
         
-        // ③ 실시간으로 대장 탭 목록을 갱신하도록 부모 컴포넌트 알림
         if (onSaveSuccess) {
           onSaveSuccess();
         } else if (onRefresh) {
@@ -140,7 +149,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
               <h2 className="font-bold text-base text-slate-900 flex items-center gap-2 text-emerald-600">
                 <CheckCircle size={18} /> AI 분석 완료 (저장 대기)
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">저장 버튼을 누르시면 법인 등기 임기 관리 대장에 영구 등록됩니다.</p>
+              <p className="text-xs text-slate-400 mt-0.5">담당자 연락처를 확인/입력 후 저장 버튼을 누르시면 대장에 영구 등록됩니다.</p>
             </div>
             <div className="flex items-center gap-2">
               <button 
@@ -162,15 +171,30 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
 
           {/* 파싱 결과 대시보드 뷰 */}
           <div className="space-y-4 text-xs">
-            {/* 기본 법인 개요 */}
+            {/* 기본 법인 개요 + 담당자 연락처 입력 칸 추가 */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <h3 className="font-bold text-slate-900 flex items-center gap-1.5 border-b pb-2"><Building2 size={16} className="text-indigo-600"/> 법인 마스터 개요</h3>
+              <h3 className="font-bold text-slate-900 flex items-center gap-1.5 border-b pb-2"><Building2 size={16} className="text-indigo-600"/> 법인 마스터 개요 및 담당자 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div><span className="text-slate-400 block mb-0.5">상호명 (법인명)</span><span className="font-bold text-slate-800 text-sm">{parsedData.corporate_name}</span></div>
                 <div><span className="text-slate-400 block mb-0.5">법인등록번호</span><span className="font-mono font-medium text-slate-800">{parsedData.registration_number}</span></div>
                 <div className="md:col-span-2"><span className="text-slate-400 block mb-0.5">본점 주소</span><span className="font-medium text-slate-800">{parsedData.head_office_address}</span></div>
                 <div><span className="text-slate-400 block mb-0.5">자본금 총액</span><span className="font-medium text-slate-800">{parsedData.capital_amount}</span></div>
                 <div><span className="text-slate-400 block mb-0.5">발행 주식 총수 / 발행한 주식 총수</span><span className="font-medium text-slate-800">{parsedData.total_shares_to_issue}주 / {parsedData.total_shares_issued}주</span></div>
+                
+                {/* 💡 새로 추가된 담당자 연락처 입력 필드 */}
+                <div className="md:col-span-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 mt-1">
+                  <label className="font-bold text-indigo-900 flex items-center gap-1 mb-1">
+                    <PhoneCall size={14} className="text-indigo-600" /> 내부 담당자 연락처 (선택 또는 필수 입력)
+                  </label>
+                  <input 
+                    type="text" 
+                    value={parsedData.manager_contact || ''}
+                    onChange={handleContactChange}
+                    placeholder="예: 010-1234-5678 또는 담당자 내선번호"
+                    className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">법인 등기부에는 나오지 않지만, 서비스 내에서 관리할 담당자 연락처를 적어두세요.</p>
+                </div>
               </div>
             </div>
 

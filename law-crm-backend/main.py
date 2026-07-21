@@ -104,14 +104,14 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash',  # 안정적인 최신 Gemini Flash 모델 지정
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=CorporateDataSchema,
-                temperature=0.1,
-            ),
-        )
+    model='gemini-1.5-flash',  # 👈 'gemini-2.0-flash'를 'gemini-1.5-flash'로 변경
+    contents=contents,
+    config=types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=CorporateDataSchema,
+        temperature=0.1,
+    ),
+)
         data = json.loads(response.text)
         
         for exec_data in data.get("executives", []):

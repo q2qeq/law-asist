@@ -6,6 +6,8 @@ import { RegistryParser } from './components/RegistryParser';
 import { CorporateLedger } from './components/CorporateLedger';
 import type { CorporateData, UpcomingAlert } from './types';
 
+const API_BASE_URL = "https://law-asist.onrender.com";
+
 function App() {
   const [activeTab, setActiveTab] = useState<'parse' | 'ledger'>('parse');
   const [alerts, setAlerts] = useState<UpcomingAlert[]>([]);
@@ -14,7 +16,7 @@ function App() {
   // 전광판 알림 API 연동
   const refreshAlerts = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/upcoming-expirations');
+      const response = await fetch(`${API_BASE_URL}/api/upcoming-expirations`);
       if (response.ok) setAlerts(await response.json());
     } catch (err) { console.error("알림 조회 에러", err); }
   };
@@ -22,7 +24,7 @@ function App() {
   // 대장 조회 및 검색 API 연동
   const refreshLedger = async (searchKeyword = '') => {
     try {
-      const response = await fetch(`http://localhost:8000/api/corporates?search=${searchKeyword}`);
+      const response = await fetch(`${API_BASE_URL}/api/corporates?search=${searchKeyword}`);
       if (response.ok) setLedgerData(await response.json());
     } catch (err) { console.error("대장 조회 에러", err); }
   };
@@ -36,7 +38,7 @@ function App() {
   // 💡 [추가] 기능 2: "더 이상 보이지 않게 하기" 버튼 클릭 시 숨김 처리 API 호출
   const handleDismissAlert = async (execId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/executives/${execId}/handle`, {
+      const response = await fetch(`${API_BASE_URL}/api/executives/${execId}/handle`, {
         method: 'POST'
       });
       if (response.ok) {

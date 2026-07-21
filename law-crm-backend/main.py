@@ -113,7 +113,7 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-1.5-flash',  # 👈 'gemini-2.0-flash'를 'gemini-1.5-flash'로 변경!
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",

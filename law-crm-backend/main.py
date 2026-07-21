@@ -82,7 +82,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     print(f"--- 상세 에러 발생: {exc.errors()} ---")
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-client = genai.Client()
+gemini_api_key = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6Ibuyo8eiAEKHBiEVxE-gY74SowPS3oqNmlzZA4Y0LSBw")
+client = genai.Client(api_key=gemini_api_key)
 
 # 3. PDF 파싱 엔드포인트
 @app.post("/api/parse-registry")

@@ -71,10 +71,15 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "https://law-asist.vercel.app",  # Vercel 배포 도메인
+        "http://localhost:5173",          # 로컬 개발 도메인
+        "http://localhost:3000",
+        "*"                              # 또는 모든 도메인 허용
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],                 # GET, POST, OPTIONS 등 모든 HTTP 메서드 허용
+    allow_headers=["*"],                 # 모든 헤더 허용
 )
 
 @app.exception_handler(RequestValidationError)

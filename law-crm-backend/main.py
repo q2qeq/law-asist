@@ -64,6 +64,10 @@ def get_legal_dates(appointed_at_str: str, position: str):
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "Server is running perfectly!"}
+
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,

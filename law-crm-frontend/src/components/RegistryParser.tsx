@@ -55,13 +55,6 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
     }
   };
 
-  // 💡 담당자 연락처 입력값 변경 핸들러
-  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setParsedData({
-      ...parsedData,
-      manager_contact: e.target.value
-    });
-  };
 
   // 2. DB 저장 API 호출 및 화면 초기화 로직
   const handleSave = async () => {

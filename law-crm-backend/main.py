@@ -64,7 +64,7 @@ def get_legal_dates(appointed_at_str: str, position: str):
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def health_check():
     return {"status": "ok", "message": "Server is running perfectly!"}
 

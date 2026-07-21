@@ -12,10 +12,14 @@ class Corporate(Base):
     capital_amount = Column(String, nullable=False)
     total_shares_to_issue = Column(String, nullable=False)
     total_shares_issued = Column(String, nullable=False)
+    
+    # 💡 [추가] 관리 담당자 컬럼
+    manager_name = Column(String, nullable=True)
+    manager_phone = Column(String, nullable=True)
 
     purposes = relationship("CorporatePurpose", back_populates="corporate", cascade="all, delete-orphan")
     executives = relationship("CorporateExecutive", back_populates="corporate", cascade="all, delete-orphan")
-
+    
 class CorporatePurpose(Base):
     __tablename__ = "corporate_purposes"
 

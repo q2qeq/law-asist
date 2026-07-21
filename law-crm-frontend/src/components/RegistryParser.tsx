@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, UserCheck, Briefcase, PhoneCall } from 'lucide-react';
 
@@ -6,8 +5,8 @@ import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, Use
 const API_BASE_URL = 'https://law-asist.onrender.com';
 
 interface ParserProps {
-  onSaveSuccess?: () => void; // App.tsx에서 넘겨주는 프롭명 (TS 빌드 에러 해결)
-  onRefresh?: () => void;     // 하위 호환성을 위해 유지
+  onSaveSuccess?: () => void; 
+  onRefresh?: () => void;     
 }
 
 export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh }) => {
@@ -16,7 +15,6 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
   const [isSaving, setIsSaving] = useState(false);
   const [parsedData, setParsedData] = useState<any | null>(null);
 
-  // 파일 선택 핸들러
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -40,8 +38,9 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
       if (response.ok) {
         const data = await response.json();
         
-        // 💡 파싱된 데이터에 사용자가 입력할 수 있는 담당자 연락처 필드 초기화 (기본값 빈 문자열)
-        data.manager_contact = data.manager_contact || '';
+        // 💡 [수정 완료] manager_contact 대신 백엔드 스키마와 일치하는 manager_name, manager_phone으로 초기화
+        data.manager_name = data.manager_name || '';
+        data.manager_phone = data.manager_phone || '';
         
         setParsedData(data);
       } else {
@@ -55,8 +54,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
     }
   };
 
-
-  // 2. DB 저장 API 호출 및 화면 초기화 로직
+  // 2. DB 저장 API 호출
   const handleSave = async () => {
     if (!parsedData) return;
     setIsSaving(true);
@@ -67,7 +65,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(parsedData), // manager_contact 필드가 포함된 상태로 전송됨
+        body: JSON.stringify(parsedData),
       });
 
       const result = await response.json();
@@ -95,7 +93,6 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 max-w-4xl mx-auto animate-fadeIn">
-      {/* 1단계: 파일 업로드 화면 (parsedData가 없을 때) */}
       {!parsedData ? (
         <div className="space-y-4">
           <div className="border-b pb-3">
@@ -136,7 +133,6 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
           )}
         </div>
       ) : (
-        /* 2단계: AI 분석 결과 확인 및 저장 화면 (parsedData가 있을 때) */
         <div className="space-y-5">
           <div className="flex justify-between items-center border-b pb-3">
             <div>
@@ -163,9 +159,7 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
             </div>
           </div>
 
-          {/* 파싱 결과 대시보드 뷰 */}
           <div className="space-y-4 text-xs">
-            {/* 기본 법인 개요 + 담당자 연락처 입력 칸 추가 */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
               <h3 className="font-bold text-slate-900 flex items-center gap-1.5 border-b pb-2"><Building2 size={16} className="text-indigo-600"/> 법인 마스터 개요 및 담당자 정보</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -175,38 +169,36 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
                 <div><span className="text-slate-400 block mb-0.5">자본금 총액</span><span className="font-medium text-slate-800">{parsedData.capital_amount}</span></div>
                 <div><span className="text-slate-400 block mb-0.5">발행 주식 총수 / 발행한 주식 총수</span><span className="font-medium text-slate-800">{parsedData.total_shares_to_issue}주 / {parsedData.total_shares_issued}주</span></div>
                 
-                {/* 💡 새로 추가된 담당자 연락처 입력 필드 */}
                 <div className="md:col-span-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 mt-1 space-y-3">
-  <label className="font-bold text-indigo-900 flex items-center gap-1">
-    <PhoneCall size={14} className="text-indigo-600" /> 내부 관리 담당자 정보 입력
-  </label>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-    <div>
-      <span className="text-[11px] text-slate-500 block mb-1">담당자 이름</span>
-      <input 
-        type="text" 
-        value={parsedData.manager_name || ''}
-        onChange={(e) => setParsedData({ ...parsedData, manager_name: e.target.value })}
-        placeholder="예: 홍길동"
-        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-    </div>
-    <div>
-      <span className="text-[11px] text-slate-500 block mb-1">담당자 연락처</span>
-      <input 
-        type="text" 
-        value={parsedData.manager_phone || ''}
-        onChange={(e) => setParsedData({ ...parsedData, manager_phone: e.target.value })}
-        placeholder="예: 010-1234-5678"
-        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
-    </div>
-  </div>
-</div>
+                  <label className="font-bold text-indigo-900 flex items-center gap-1">
+                    <PhoneCall size={14} className="text-indigo-600" /> 내부 관리 담당자 정보 입력
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block mb-1">담당자 이름</span>
+                      <input 
+                        type="text" 
+                        value={parsedData.manager_name || ''}
+                        onChange={(e) => setParsedData({ ...parsedData, manager_name: e.target.value })}
+                        placeholder="예: 홍길동"
+                        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block mb-1">담당자 연락처</span>
+                      <input 
+                        type="text" 
+                        value={parsedData.manager_phone || ''}
+                        onChange={(e) => setParsedData({ ...parsedData, manager_phone: e.target.value })}
+                        placeholder="예: 010-1234-5678"
+                        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 등기 임원 명단 */}
             <div className="space-y-2">
               <h3 className="font-bold text-slate-900 flex items-center gap-1.5"><UserCheck size={16} className="text-slate-400"/> 파싱된 임원 명부 ({parsedData.executives?.length || 0}명)</h3>
               <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -233,7 +225,6 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
               </div>
             </div>
 
-            {/* 목적 사업 */}
             <div className="space-y-2">
               <h3 className="font-bold text-slate-900 flex items-center gap-1.5"><Briefcase size={16} className="text-slate-400"/> 정관 목적 사업 항목 ({parsedData.purposes?.length || 0}건)</h3>
               <div className="flex flex-wrap gap-1.5 bg-slate-50/50 p-3 border rounded-xl">

@@ -38,6 +38,8 @@ class CorporateDataSchema(BaseModel):
     capital_amount: str
     total_shares_to_issue: str
     total_shares_issued: str
+    manager_name: Optional[str] = ""   # 💡 [추가]
+    manager_phone: Optional[str] = ""  # 💡 [추가]
     purposes: List[str]
     executives: List[ExecutiveSchema]
 
@@ -194,7 +196,9 @@ async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(g
             head_office_address=data.head_office_address,
             capital_amount=data.capital_amount,
             total_shares_to_issue=data.total_shares_to_issue,
-            total_shares_issued=data.total_shares_issued
+            total_shares_issued=data.total_shares_issued,
+            manager_name=data.manager_name,    # 💡 [추가]
+            manager_phone=data.manager_phone   # 💡 [추가]
         )
         db.add(db_corporate)
         db.flush()
@@ -282,6 +286,8 @@ def get_all_corporates(search: str = "", db: Session = Depends(get_db)):
                 "capital_amount": corp.capital_amount,
                 "total_shares_to_issue": corp.total_shares_to_issue,
                 "total_shares_issued": corp.total_shares_issued,
+                "manager_name": corp.manager_name or "",   # 💡 [추가]
+                "manager_phone": corp.manager_phone or "", # 💡 [추가]
                 "executives": [{
                     "id": e.id,
                     "name": e.name,
@@ -321,6 +327,8 @@ def update_corporate_data(corp_id: int, updated_data: dict, db: Session = Depend
         corp.capital_amount = updated_data.get("capital_amount", corp.capital_amount)
         corp.total_shares_to_issue = updated_data.get("total_shares_to_issue", corp.total_shares_to_issue)
         corp.total_shares_issued = updated_data.get("total_shares_issued", corp.total_shares_issued)
+        corp.manager_name = updated_data.get("manager_name", corp.manager_name)       # 💡 [추가]
+        corp.manager_phone = updated_data.get("manager_phone", corp.manager_phone)
         
         for exec_item in updated_data.get("executives", []):
             exec_db = db.query(models.CorporateExecutive).filter(models.CorporateExecutive.id == exec_item.get("id")).first()

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 from sqlalchemy.orm import Session
+from sqlalchemy import text  # 💡 [추가] SQL 직접 실행을 위한 text 임포트
 
 import models
 from models import Corporate
@@ -38,8 +39,8 @@ class CorporateDataSchema(BaseModel):
     capital_amount: str
     total_shares_to_issue: str
     total_shares_issued: str
-    manager_name: Optional[str] = ""   # 💡 [추가]
-    manager_phone: Optional[str] = ""  # 💡 [추가]
+    manager_name: Optional[str] = ""   
+    manager_phone: Optional[str] = ""  
     purposes: List[str]
     executives: List[ExecutiveSchema]
 
@@ -68,6 +69,16 @@ def get_legal_dates(appointed_at_str: str, position: str):
 
 # 2. FastAPI 초기화 및 DB 테이블 생성
 models.Base.metadata.create_all(bind=engine)
+
+# 💡 [자동 컬럼 생성 코드 추가]
+with engine.begin() as conn:
+    try:
+        conn.execute(text("ALTER TABLE corporates ADD COLUMN IF NOT EXISTS manager_name VARCHAR;"))
+        conn.execute(text("ALTER TABLE corporates ADD COLUMN IF NOT EXISTS manager_phone VARCHAR;"))
+        print("✅ 데이터베이스 컬럼 확인 및 자동 추가 완료")
+    except Exception as e:
+        print(f"⚠️ 컬럼 추가 중 예외 발생 (이미 존재할 수 있음): {e}")
+
 app = FastAPI()
 
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -77,10 +88,10 @@ def health_check():
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],                 # 모든 도메인 허용
+    allow_origins=["*"],                 
     allow_credentials=True,
-    allow_methods=["*"],                 # 모든 HTTP 메서드 허용
-    allow_headers=["*"],                 # 모든 헤더 허용
+    allow_methods=["*"],                 
+    allow_headers=["*"],                 
 )
 
 @app.exception_handler(RequestValidationError)
@@ -94,7 +105,6 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
     global last_parse_time
     current_time = time.time()
 
-    # 1️⃣ [쿼터 보호] 3초 이내 중복 요청 연타 차단
     if current_time - last_parse_time < 3.0:
         print("⚠️ [WARNING] 너무 짧은 시간에 중복 요청이 들어와 차단했습니다.")
         raise HTTPException(
@@ -104,11 +114,9 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
     
     last_parse_time = current_time
 
-    # 2️⃣ 파일 확장자 검증
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="PDF 파일만 가능합니다.")
 
-    # 3️⃣ API 키 검증
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("❌ [ERROR] GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
@@ -119,7 +127,6 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
 
     pdf_content = await file.read()
     
-    # 4️⃣ [프롬프트 강화] 임원 누락 방지 및 정밀 추출 지침
     prompt = """
     제시된 법인 등기부등본 PDF 문서를 정밀하게 분석하여 JSON 형태로 데이터를 추출하세요.
 
@@ -146,12 +153,11 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=CorporateDataSchema,
-                temperature=0.1,  # 일관성을 위해 낮은 난수성 유지
+                temperature=0.1,  
             ),
         )
         data = json.loads(response.text)
         
-        # 5️⃣ 임원 데이터 가공 및 날짜 보정
         executives_list = data.get("executives", [])
         if not executives_list:
             print("⚠️ [WARNING] AI가 추출한 임원 데이터가 비어있습니다. PDF 문서를 다시 확인하세요.")
@@ -163,7 +169,6 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
             raw_appointed = exec_data.get("appointed_at", "")
             raw_position = exec_data.get("position", "")
             
-            # 법정 임기 계산 방어 로직
             try:
                 app_d, exp_d = get_legal_dates(raw_appointed, raw_position)
                 exec_data["appointed_at"] = app_d.strftime("%Y-%m-%d")
@@ -197,8 +202,8 @@ async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(g
             capital_amount=data.capital_amount,
             total_shares_to_issue=data.total_shares_to_issue,
             total_shares_issued=data.total_shares_issued,
-            manager_name=data.manager_name,    # 💡 [추가]
-            manager_phone=data.manager_phone   # 💡 [추가]
+            manager_name=data.manager_name,    
+            manager_phone=data.manager_phone   
         )
         db.add(db_corporate)
         db.flush()
@@ -286,8 +291,8 @@ def get_all_corporates(search: str = "", db: Session = Depends(get_db)):
                 "capital_amount": corp.capital_amount,
                 "total_shares_to_issue": corp.total_shares_to_issue,
                 "total_shares_issued": corp.total_shares_issued,
-                "manager_name": corp.manager_name or "",   # 💡 [추가]
-                "manager_phone": corp.manager_phone or "", # 💡 [추가]
+                "manager_name": corp.manager_name or "",   
+                "manager_phone": corp.manager_phone or "", 
                 "executives": [{
                     "id": e.id,
                     "name": e.name,
@@ -327,7 +332,7 @@ def update_corporate_data(corp_id: int, updated_data: dict, db: Session = Depend
         corp.capital_amount = updated_data.get("capital_amount", corp.capital_amount)
         corp.total_shares_to_issue = updated_data.get("total_shares_to_issue", corp.total_shares_to_issue)
         corp.total_shares_issued = updated_data.get("total_shares_issued", corp.total_shares_issued)
-        corp.manager_name = updated_data.get("manager_name", corp.manager_name)       # 💡 [추가]
+        corp.manager_name = updated_data.get("manager_name", corp.manager_name)       
         corp.manager_phone = updated_data.get("manager_phone", corp.manager_phone)
         
         for exec_item in updated_data.get("executives", []):

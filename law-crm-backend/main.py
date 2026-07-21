@@ -18,6 +18,10 @@ import models
 from models import Corporate
 from database import engine, get_db
 
+import time
+
+last_parse_time = 0.0
+
 # 1. 스키마 정의
 class ExecutiveSchema(BaseModel):
     name: str = Field(description="임원 이름")
@@ -83,28 +87,50 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
-# 3. PDF 파싱 엔드포인트
 @app.post("/api/parse-registry")
 async def parse_registry_pdf(file: UploadFile = File(...)):
+    global last_parse_time
+    current_time = time.time()
+
+    # 1️⃣ [쿼터 보호] 3초 이내 중복 요청 연타 차단
+    if current_time - last_parse_time < 3.0:
+        print("⚠️ [WARNING] 너무 짧은 시간에 중복 요청이 들어와 차단했습니다.")
+        raise HTTPException(
+            status_code=429, 
+            detail="요청 처리 중이거나 연속 클릭입니다. 3초 후 다시 시도해 주세요."
+        )
+    
+    last_parse_time = current_time
+
+    # 2️⃣ 파일 확장자 검증
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="PDF 파일만 가능합니다.")
 
-    # 💡 Render 환경변수에서 GEMINI_API_KEY를 동적으로 읽어옵니다.
+    # 3️⃣ API 키 검증
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         print("❌ [ERROR] GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
         raise HTTPException(status_code=500, detail="서버에 GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
     
-    # 디버깅용: 서버 로그에서 읽어온 키의 앞 5자리 확인
     print(f"✅ [DEBUG] 사용 중인 API Key (앞 5자리): {api_key[:5]}...")
-
-    # 동적으로 가져온 API Key로 Gemini 클라이언트 생성
     client = genai.Client(api_key=api_key)
 
     pdf_content = await file.read()
     
+    # 4️⃣ [프롬프트 강화] 임원 누락 방지 및 정밀 추출 지침
+    prompt = """
+    제시된 법인 등기부등본 PDF 문서를 정밀하게 분석하여 JSON 형태로 데이터를 추출하세요.
+
+    [필수 추출 지침]
+    1. '임원에 관한 사항' 섹션을 정밀하게 스캔하여 대표이사, 사내이사, 사외이사, 기타비상무이사, 감사 등 기재된 모든 임원 목록을 단 하나도 누락 없이 `executives` 배열에 추출하세요.
+    2. '직위/직책(position)'과 '이름(name)'을 명확히 구분하여 입력하세요.
+    3. 취임/재임 날짜(appointed_at)는 문서에 표기된 날짜를 반드시 'YYYY-MM-DD' 형식으로 변환하세요. (예: 2023년 5월 12일 -> 2023-05-12)
+    4. 만약 만료 날짜(expired_at)가 문서에 명시되어 있지 않다면, 취임 날짜(appointed_at)와 동일하게 우선 입력하세요.
+    5. '목적' 항목에 명시된 사업 목적들(`purposes`)도 배열로 모두 추출하세요.
+    """
+
     contents = [
-        "이 등기부등본 문서를 분석하여 데이터를 추출하세요.",
+        prompt,
         types.Part.from_bytes(
             data=pdf_content,
             mime_type='application/pdf'
@@ -113,29 +139,44 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',  # 👈 'gemini-2.0-flash'를 'gemini-1.5-flash'로 변경!
+            model='gemini-2.5-flash',
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=CorporateDataSchema,
-                temperature=0.1,
+                temperature=0.1,  # 일관성을 위해 낮은 난수성 유지
             ),
         )
         data = json.loads(response.text)
         
-        for exec_data in data.get("executives", []):
+        # 5️⃣ 임원 데이터 가공 및 날짜 보정
+        executives_list = data.get("executives", [])
+        if not executives_list:
+            print("⚠️ [WARNING] AI가 추출한 임원 데이터가 비어있습니다. PDF 문서를 다시 확인하세요.")
+
+        for exec_data in executives_list:
             exec_data["phone"] = exec_data.get("phone") or ""
             exec_data["is_handled"] = bool(exec_data.get("is_handled", False))
             
-            app_d, exp_d = get_legal_dates(exec_data.get("appointed_at", ""), exec_data.get("position", ""))
-            exec_data["appointed_at"] = app_d.strftime("%Y-%m-%d")
-            exec_data["expired_at"] = exp_d.strftime("%Y-%m-%d")
+            raw_appointed = exec_data.get("appointed_at", "")
+            raw_position = exec_data.get("position", "")
+            
+            # 법정 임기 계산 방어 로직
+            try:
+                app_d, exp_d = get_legal_dates(raw_appointed, raw_position)
+                exec_data["appointed_at"] = app_d.strftime("%Y-%m-%d")
+                exec_data["expired_at"] = exp_d.strftime("%Y-%m-%d")
+            except Exception as dt_err:
+                print(f"⚠️ 날짜 변환 경고 ({exec_data.get('name', '미상')}): {dt_err}")
+                exec_data["appointed_at"] = raw_appointed or date.today().strftime("%Y-%m-%d")
+                exec_data["expired_at"] = exec_data.get("expired_at") or date.today().strftime("%Y-%m-%d")
             
         return data
+
     except Exception as e:
         print(f"❌ Gemini API Error: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini 분석 오류: {str(e)}")
-
+    
 # 4. 안전한 법인 데이터 저장 API
 @app.post("/api/save-corporate")
 async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(get_db)):

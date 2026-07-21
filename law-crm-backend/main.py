@@ -37,9 +37,8 @@ class CorporateDataSchema(BaseModel):
     purposes: List[str]
     executives: List[ExecutiveSchema]
 
-# [수정] 이사 임기 계산 시 -1일 없이 무조건 연도만 +3년 하도록 보정된 계산기
+# 이사 임기 계산기
 def get_legal_dates(appointed_at_str: str, position: str):
-    # 취임일 문자열 전처리 (. 이나 공백 제거)
     clean_str = appointed_at_str.strip().replace(" ", "").replace(".", "-")
     if clean_str.endswith("-"): 
         clean_str = clean_str[:-1]
@@ -49,36 +48,28 @@ def get_legal_dates(appointed_at_str: str, position: str):
     except Exception:
         appointed_date = date.today()
 
-    # 직책별 임기 만료일 계산
     if "감사" in position:
-        # 감사: 취임 후 3년 내 최종 결산기 정기주총 종결일 (3년 뒤 3월 31일 추정 안내)
         target_year = appointed_date.year + 3
         expired_date = date(target_year, 3, 31)
     else:
-        # 이사 계열: 날짜 차감 없이 취임 월·일 그대로 연도만 무조건 +3년 연장
         try:
             expired_date = appointed_date.replace(year=appointed_date.year + 3)
         except ValueError:
-            # 윤년 예외 처리 (2월 29일 취임하여 3년 뒤에 29일이 없는 경우, 가장 가까운 2월 28일로 매칭)
             expired_date = date(appointed_date.year + 3, 2, 28)
             
     return appointed_date, expired_date
 
 
-# 2. FastAPI 초기화 및 데이터베이스 테이블 생성
+# 2. FastAPI 초기화 및 DB 테이블 생성
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://law-asist.vercel.app",  # Vercel 배포 도메인
-        "http://localhost:5173",          # 로컬 개발 도메인
-        "http://localhost:3000",
-        "*"                              # 또는 모든 도메인 허용
-    ],
+    allow_origins=["*"],                 # 모든 도메인 허용
     allow_credentials=True,
-    allow_methods=["*"],                 # GET, POST, OPTIONS 등 모든 HTTP 메서드 허용
+    allow_methods=["*"],                 # 모든 HTTP 메서드 허용
     allow_headers=["*"],                 # 모든 헤더 허용
 )
 
@@ -87,8 +78,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     print(f"--- 상세 에러 발생: {exc.errors()} ---")
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-gemini_api_key = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6Ibuyo8eiAEKHBiEVxE-gY74SowPS3oqNmlzZA4Y0LSBw")
-client = genai.Client(api_key=gemini_api_key)
 
 # 3. PDF 파싱 엔드포인트
 @app.post("/api/parse-registry")
@@ -96,9 +85,20 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="PDF 파일만 가능합니다.")
 
+    # 💡 Render 환경변수에서 GEMINI_API_KEY를 동적으로 읽어옵니다.
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("❌ [ERROR] GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
+        raise HTTPException(status_code=500, detail="서버에 GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
+    
+    # 디버깅용: 서버 로그에서 읽어온 키의 앞 5자리 확인
+    print(f"✅ [DEBUG] 사용 중인 API Key (앞 5자리): {api_key[:5]}...")
+
+    # 동적으로 가져온 API Key로 Gemini 클라이언트 생성
+    client = genai.Client(api_key=api_key)
+
     pdf_content = await file.read()
     
-    # 💡 PDF 바이너리 데이터를 Gemini에게 직접 전달 (이미지 변환 과정 불필요!)
     contents = [
         "이 등기부등본 문서를 분석하여 데이터를 추출하세요.",
         types.Part.from_bytes(
@@ -109,35 +109,33 @@ async def parse_registry_pdf(file: UploadFile = File(...)):
 
     try:
         response = client.models.generate_content(
-    model='gemini-2.0-flash',  # 👈 gemini-2.0-flash 로 설정
-    contents=contents,
-    config=types.GenerateContentConfig(
-        response_mime_type="application/json",
-        response_schema=CorporateDataSchema,
-        temperature=0.1,
-    ),
-)
+            model='gemini-2.0-flash',
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=CorporateDataSchema,
+                temperature=0.1,
+            ),
+        )
         data = json.loads(response.text)
         
         for exec_data in data.get("executives", []):
             exec_data["phone"] = exec_data.get("phone") or ""
             exec_data["is_handled"] = bool(exec_data.get("is_handled", False))
             
-            # 파싱 직후 즉시 날짜 연산 및 규격화하여 프론트엔드로 전송
             app_d, exp_d = get_legal_dates(exec_data.get("appointed_at", ""), exec_data.get("position", ""))
             exec_data["appointed_at"] = app_d.strftime("%Y-%m-%d")
             exec_data["expired_at"] = exp_d.strftime("%Y-%m-%d")
             
         return data
     except Exception as e:
-        print(f"Gemini API Error: {e}")  # Render Logs에서 에러를 볼 수 있도록 print 추가
+        print(f"❌ Gemini API Error: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini 분석 오류: {str(e)}")
 
 # 4. 안전한 법인 데이터 저장 API
 @app.post("/api/save-corporate")
 async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(get_db)):
     try:
-        # 기존 중복 데이터 선행 삭제
         existing = db.query(models.Corporate).filter(models.Corporate.registration_number == data.registration_number).first()
         if existing:
             db.query(models.CorporatePurpose).filter(models.CorporatePurpose.corporate_id == existing.id).delete()
@@ -145,7 +143,6 @@ async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(g
             db.delete(existing)
             db.commit()
 
-        # 법인 마스터 정보 빌드
         db_corporate = models.Corporate(
             corporate_name=data.corporate_name,
             registration_number=data.registration_number,
@@ -157,11 +154,9 @@ async def save_corporate_data(data: CorporateDataSchema, db: Session = Depends(g
         db.add(db_corporate)
         db.flush()
 
-        # 목적사업 등록
         for p_text in data.purposes:
             db.add(models.CorporatePurpose(corporate_id=db_corporate.id, purpose_text=p_text))
 
-        # 임원 정보 최종 검증 및 등록
         for exec_data in data.executives:
             appointed_date, expired_date = get_legal_dates(exec_data.appointed_at, exec_data.position)
 

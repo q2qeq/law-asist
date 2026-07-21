@@ -183,19 +183,33 @@ export const RegistryParser: React.FC<ParserProps> = ({ onSaveSuccess, onRefresh
                 <div><span className="text-slate-400 block mb-0.5">발행 주식 총수 / 발행한 주식 총수</span><span className="font-medium text-slate-800">{parsedData.total_shares_to_issue}주 / {parsedData.total_shares_issued}주</span></div>
                 
                 {/* 💡 새로 추가된 담당자 연락처 입력 필드 */}
-                <div className="md:col-span-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 mt-1">
-                  <label className="font-bold text-indigo-900 flex items-center gap-1 mb-1">
-                    <PhoneCall size={14} className="text-indigo-600" /> 내부 담당자 연락처 (선택 또는 필수 입력)
-                  </label>
-                  <input 
-                    type="text" 
-                    value={parsedData.manager_contact || ''}
-                    onChange={handleContactChange}
-                    placeholder="예: 010-1234-5678 또는 담당자 내선번호"
-                    className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">법인 등기부에는 나오지 않지만, 서비스 내에서 관리할 담당자 연락처를 적어두세요.</p>
-                </div>
+                <div className="md:col-span-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 mt-1 space-y-3">
+  <label className="font-bold text-indigo-900 flex items-center gap-1">
+    <PhoneCall size={14} className="text-indigo-600" /> 내부 관리 담당자 정보 입력
+  </label>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+    <div>
+      <span className="text-[11px] text-slate-500 block mb-1">담당자 이름</span>
+      <input 
+        type="text" 
+        value={parsedData.manager_name || ''}
+        onChange={(e) => setParsedData({ ...parsedData, manager_name: e.target.value })}
+        placeholder="예: 홍길동"
+        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
+    </div>
+    <div>
+      <span className="text-[11px] text-slate-500 block mb-1">담당자 연락처</span>
+      <input 
+        type="text" 
+        value={parsedData.manager_phone || ''}
+        onChange={(e) => setParsedData({ ...parsedData, manager_phone: e.target.value })}
+        placeholder="예: 010-1234-5678"
+        className="w-full bg-white border border-indigo-200 rounded-md px-3 py-2 text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
+    </div>
+  </div>
+</div>
               </div>
             </div>
 

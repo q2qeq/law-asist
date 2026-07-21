@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Search, Building2, Edit3, Save, UserCheck, Briefcase, Trash2, Phone, UserCircle } from 'lucide-react';
 import type { CorporateData, Executive } from '../types';
 
+// 💡 Vercel 프론트엔드와 Render 백엔드 간의 통신을 위한 백엔드 주소 명시
+const API_BASE_URL = 'https://law-asist.onrender.com';
+
 interface LedgerProps {
   ledgerData: CorporateData[];
   onSearch: (keyword: string) => void;
@@ -39,11 +42,11 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
     }
   };
 
-  // 삭제 요청 API 호출 (상대 경로 사용으로 배포 환경 대응)
+  // 삭제 요청 API 호출
   const handleDeleteData = async (id: number) => {
     if (!window.confirm("이 법인 대장 기록을 정말로 영구 삭제하시겠습니까?")) return;
     try {
-      const response = await fetch(`/api/corporates/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/corporates/${id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -57,11 +60,11 @@ export const CorporateLedger: React.FC<LedgerProps> = ({ ledgerData, onSearch, o
     }
   };
 
-  // 수정 저장 API 호출 (상대 경로 사용으로 배포 환경 대응)
+  // 수정 저장 API 호출
   const saveUpdatedData = async () => {
     if (!editForm) return;
     try {
-      const response = await fetch(`/api/corporates/${editForm.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/corporates/${editForm.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm)

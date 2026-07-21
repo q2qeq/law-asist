@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardHeader } from './components/DashboardHeader';
 import { ExpirationAlerts } from './components/ExpirationAlerts';
 import { RegistryParser } from './components/RegistryParser';

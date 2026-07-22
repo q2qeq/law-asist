@@ -3,7 +3,7 @@ import { Search, Building2, Edit3, Save, UserCheck, Briefcase, Trash2, Phone, Us
 import type { CorporateData, Executive } from '../types';
 
 // 💡 Vercel 프론트엔드와 Render 백엔드 간의 통신을 위한 백엔드 주소 명시
-const API_BASE_URL = 'https://law-asist.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://law-asist-1.onrender.com';
 
 interface LedgerProps {
   ledgerData: CorporateData[];

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Upload, FileText, Loader2, CheckCircle, Save, ArrowLeft, Building2, UserCheck, Briefcase, PhoneCall } from 'lucide-react';
 
 // Render 배포 백엔드 서버 주소
-const API_BASE_URL = 'https://law-asist.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://law-asist-1.onrender.com';
 
 interface ParserProps {
   onSaveSuccess?: () => void; 

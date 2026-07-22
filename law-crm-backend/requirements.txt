@@ -5,3 +5,4 @@ protobuf>=4.21.5,<5.0.0
 python-multipart
 psycopg2-binary
 google-genai
+uvicorn[standard]

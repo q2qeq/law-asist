@@ -6,7 +6,7 @@ import { RegistryParser } from './components/RegistryParser';
 import { CorporateLedger } from './components/CorporateLedger';
 import type { CorporateData, UpcomingAlert } from './types';
 
-const API_BASE_URL = "https://law-asist.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://law-asist.onrender.com";
 
 function App() {
   const [activeTab, setActiveTab] = useState<'parse' | 'ledger'>('parse');
